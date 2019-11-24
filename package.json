@@ -1,0 +1,22 @@
+{
+  "name": "ws-connect",
+  "version": "1.0.0",
+  "description": "",
+  "main": "Boat.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/alexmerz/ws-connect.git"
+  },
+  "author": "",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/alexmerz/ws-connect/issues"
+  },
+  "homepage": "https://github.com/alexmerz/ws-connect#readme",
+  "dependencies": {
+    "websocket": "^1.0.30"
+  }
+}
