@@ -6,15 +6,17 @@ const Boat = {
     CMD_STOP : 'stop',
     CMD_NOP : 'nop',
 
-    DIR_FORWARD : 0b10,
-    DIR_BACK : 0b01,
-    DIR_LEFT : 0b11,
-    DIR_RIGHT : 0b00,
+    DIR_FORWARD : 0b1010,
+    DIR_BACK : 0b0101,
+    DIR_LEFT : 0b0110,
+    DIR_RIGHT : 0b1001,
 
-    MOTOR1 : 0b10,
-    MOTOR2 : 0b01,
+    MOTOR1LN1 : 0b1000,
+    MOTOR1LN2 : 0b0100,
+    MOTOR2LN3 : 0b0010,
+    MOTOR2LN4 : 0b0001,
 
-    MAX_SPEED : 17000,
+    MAX_SPEED : 250000,
 
     state : {
         command_counter : 0, // number of received command
@@ -28,6 +30,15 @@ const Boat = {
     },
 
     accZBuffer : [],        // needed to calculate the rotation acc
+    port : null,
+
+    enA : null,
+    ln1 : null,
+    ln2 : null,
+
+    enB : null,
+    ln3 : null,
+    ln4 : null,
 
     target : {
         new_degree : 0,             // degrees
@@ -53,6 +64,37 @@ const Boat = {
         setInterval(()=>{this.processState();}, 10); // set actuator according to state
         setInterval(()=>{this.timerUpdate();}, 100); // timer for forward/back
         setInterval(()=>{this.rotationUpdate();}, 100); // check acc z rotation
+        const SerialPort = require('serialport');
+        this.port = new SerialPort('/dev/ttyAMA0', {baudRate:9600});
+        const Readline = require('@serialport/parser-readline');
+        const parser = new Readline();
+
+        const GPS = require('gps');
+        const gps = new GPS;
+
+        gps.on('data', (data) => {
+            console.log(this.state);
+            console.log(this.target);
+            this.state.gps.lat =  gps.state.lat || null;
+
+            this.state.gps.lon = gps.state.lon || null;
+        });
+
+        this.port.pipe(parser);
+
+        parser.on('data', (line) => {
+            gps.update(line);
+        });
+
+        const Gpio = require('pigpio').Gpio;
+
+        this.enA = new Gpio(12, {mode:Gpio.OUTPUT});
+        this.ln1 = new Gpio(17, {mode:Gpio.OUTPUT});
+        this.ln2 = new Gpio(27, {mode:Gpio.OUTPUT});
+
+        this.enB = new Gpio(13, {mode:Gpio.OUTPUT});
+        this.ln3 = new Gpio(24, {mode:Gpio.OUTPUT});
+        this.ln4 = new Gpio(23, {mode:Gpio.OUTPUT});
     },
 
     onMessage : async function(message, /*connection*/ cb) {
@@ -83,7 +125,7 @@ const Boat = {
                 break;
             case this.CMD_RIGHT :
                 this.resetTarget();
-                this.target.new_degee = command.value;
+                this.target.new_degree = command.value;
                 this.state.motor_direction = this.DIR_RIGHT;
                 this.state.motor_speed = this.MAX_SPEED;
                 break;
@@ -122,22 +164,13 @@ const Boat = {
 
     setMotor : function(matrix, speed) {
         // set speed for Motor 1 and 2
-        // Motor1.hardwarePwmWrite(1000000, speed)
-        // Motor2.hardwarePwmWrite(1000000, speed)
-        if(matrix & this.MOTOR1) {
-            // Motor1_PinA.digitalWrite(1)
-            // Motor1_PinB.digitalWrite(0)
-        } else {
-            // Motor1_PinA.digitalWrite(0)
-            // Motor1_PinB.digitalWrite(1)
-        }
-        if(matrix & this.MOTOR2) {
-            // Motor2_PinA.digitalWrite(1)
-            // Motor2_PinB.digitalWrite(0)
-        } else {
-            // Motor2_PinA.digitalWrite(0)
-            // Motor2_PinB.digitalWrite(1)
-        }
+        this.enA.hardwarePwmWrite(1000000, speed);
+        this.enB.hardwarePwmWrite(1000000, speed);
+
+        this.ln1.digitalWrite((matrix & this.MOTOR1LN1) ? 1 : 0);
+        this.ln2.digitalWrite((matrix & this.MOTOR1LN2) ? 1 : 0);
+        this.ln3.digitalWrite((matrix & this.MOTOR2LN3) ? 1 : 0);
+        this.ln4.digitalWrite((matrix & this.MOTOR2LN4) ? 1 : 0);
     },
 
     /*
